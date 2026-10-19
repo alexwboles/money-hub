@@ -1,5 +1,6 @@
-/* money-hub UI — renders product cards from the shared catalogue and
-   powers the household ledger console (bridges A + B). */
+/* money-hub UI — renders product cards from the shared catalogue, powers
+   the household ledger console (bridges A + B), the money-flow diagram,
+   health vitals, ledger history and the household roadmap. */
 (function () {
   "use strict";
   var H = window.MoneyHub;
@@ -60,12 +61,23 @@
       return raw ? JSON.parse(raw) : null;
     } catch (e) { return null; }
   }
+  function writeKey(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+  }
+
+  var state = { summary: null, hasData: false };
 
   function renderLedger() {
     var cashflow = readKey("budgetlens.cashflow.v1");
     var debts = readKey("debtpayoff.debts.v1");
     var s = H.householdSummary(debts, cashflow);
     var hasAny = !!cashflow || (debts && debts.length);
+    state.summary = s;
+    state.hasData = hasAny;
 
     $("ledger-empty").hidden = !!hasAny;
     $("ledger-source").innerHTML = hasAny
@@ -82,8 +94,14 @@
       $("l-rate-bar").style.width = Math.min(100, Math.max(0, pct)) + "%";
       var tc = $("l-topcats");
       tc.innerHTML = "";
+      var inTotal = s.monthlyIncome || s.monthlySpending || 1;
       s.topCategories.forEach(function (c) {
-        tc.appendChild(el("span", "topcat", c.icon + " " + c.name + " " + H.money(c.monthly) + "/mo"));
+        var share = Math.round((Number(c.monthly) || 0) / inTotal * 100);
+        var chip = el("span", "topcat");
+        chip.appendChild(el("i", "topcat-bar"));
+        chip.firstChild.style.width = Math.min(100, Math.max(2, share * 2)) + "%";
+        chip.appendChild(document.createTextNode(c.icon + " " + c.name + " " + H.money(c.monthly) + "/mo · " + share + "%"));
+        tc.appendChild(chip);
       });
     }
 
@@ -129,6 +147,241 @@
     } else {
       verdict.textContent = "";
     }
+
+    renderVitals(s, hasAny);
+    renderFlow(s, hasAny);
+    renderHistory(s, hasAny);
+    renderRoadmap(s);
+  }
+
+  /* ---------- health vitals ---------- */
+  function renderVitals(s, hasAny) {
+    var band = $("h-band");
+    if (!hasAny) {
+      band.textContent = "—"; band.className = "band";
+      $("h-band-label").textContent = "—";
+      $("h-projected").textContent = "—";
+      $("h-horizon").textContent = "—";
+      return;
+    }
+    var b = H.savingsBand(s.savingsRate);
+    band.textContent = b.label;
+    band.className = "band tone-" + b.tone;
+    $("h-band-label").textContent = Math.round((s.savingsRate || 0) * 100) +
+      "% of income kept · benchmarks: 20%+ excellent, 10–20% healthy, under 10% building";
+    $("h-projected").textContent = H.moneySigned(s.monthlyKept * 12);
+    $("h-horizon").textContent = s.monthsOfKeeping ? "~" + s.monthsOfKeeping + " months" : "—";
+  }
+
+  /* ---------- money-flow diagram: proportional stacked bars ---------- */
+  var NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(NS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function flowText(x, y, str, cls) {
+    var t = svgEl("text", { x: x, y: y, "class": cls || "f-label" });
+    t.textContent = str;
+    return t;
+  }
+
+  function renderFlow(s, hasAny) {
+    var host = $("flow-svg");
+    host.innerHTML = "";
+    var W = 960, Hh = 512;
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + Hh, "class": "flow-art" });
+    host.appendChild(svg);
+
+    if (!hasAny) {
+      var emptySvg = svgEl("svg", { viewBox: "0 0 960 330", "class": "flow-art" });
+      host.replaceChild(emptySvg, svg);
+      svg = emptySvg;
+      svg.appendChild(svgEl("rect", { x: 30, y: 80, width: 900, height: 150, "class": "f-empty" }));
+      var e1 = flowText(480, 148, "Your money in motion will appear here.", "f-empty-t");
+      e1.setAttribute("text-anchor", "middle");
+      svg.appendChild(e1);
+      var e2 = flowText(480, 174, "Run BudgetLens and DebtPayoff on this same origin.", "f-empty-s");
+      e2.setAttribute("text-anchor", "middle");
+      svg.appendChild(e2);
+      $("flow-caption").textContent = "No live data yet \u2014 the diagram draws itself from your BudgetLens cash-flow and DebtPayoff debts.";
+      return;
+    }
+
+    var labelX = 24, barX = 228, barW = 560, barH = 52;
+    var rows = [44, 164, 284, 404];
+
+    function rowLabel(y, title, amount, sub) {
+      svg.appendChild(flowText(labelX, y + 20, title, "b-title"));
+      svg.appendChild(flowText(labelX, y + 42, amount, "b-amount"));
+      if (sub) svg.appendChild(flowText(labelX, y + 60, sub, "b-sub"));
+    }
+    function seg(x, y, w, cls, label, dark) {
+      if (w < 3) return x;
+      svg.appendChild(svgEl("rect", { x: x, y: y, width: w, height: barH, "class": cls }));
+      if (label) {
+        var inside = w >= 150;
+        var tx = inside ? x + w / 2 : x + w + 12;
+        var t = flowText(tx, y + barH / 2 + 5, label,
+          inside ? (dark ? "b-seglabel-d" : "b-seglabel-l") : "b-seglabel-o");
+        if (inside) t.setAttribute("text-anchor", "middle");
+        svg.appendChild(t);
+      }
+      return x + w;
+    }
+    function rule(y) {
+      svg.appendChild(svgEl("line", { x1: barX, y1: y + barH + 20, x2: barX + barW, y2: y + barH + 20, "class": "b-rule" }));
+    }
+
+    var income = Math.max(1, s.monthlyIncome || 0);
+    var spend = Math.max(0, s.monthlySpending || 0);
+    var kept = Math.max(0, s.monthlyKept || 0);
+    var attack = Math.max(0, Math.min(s.suggestedAttack || 0, kept));
+    var buffer = kept - attack;
+    var mins = s.totalMin || 0;
+    var interest = Math.min(s.monthlyInterest || 0, mins);
+    var debt = s.totalDebt || 0;
+
+    /* Row 1: income splits into spent and kept */
+    rowLabel(rows[0], "INCOME", H.money(income) + "/mo");
+    var x = barX;
+    x = seg(x, rows[0], spend / income * barW, "b-seg-spent", "Spent " + H.money(spend) + "/mo", true);
+    x = seg(x, rows[0], kept / income * barW, "b-seg-kept", "Kept " + H.moneySigned(kept) + "/mo", true);
+    rule(rows[0]);
+
+    /* Row 2: kept splits into attack and buffer */
+    rowLabel(rows[1], "KEPT", H.moneySigned(kept) + "/mo",
+      kept > 0 ? "every kept dollar is one the debt doesn't own" : null);
+    x = barX;
+    if (kept > 0) {
+      x = seg(x, rows[1], attack / kept * barW, "b-seg-attack",
+        attack > 0 ? "Attack " + H.money(attack) + "/mo" : null, true);
+      x = seg(x, rows[1], buffer / kept * barW, "b-seg-buffer",
+        "Buffer " + H.money(buffer) + "/mo", false);
+    } else {
+      svg.appendChild(flowText(barX + 12, rows[1] + barH / 2 + 5, "Nothing kept this month.", "b-seglabel-o"));
+    }
+    rule(rows[1]);
+
+    /* Row 3: minimums split into interest and principal */
+    var intShare = mins > 0 ? Math.round(interest / mins * 100) : 0;
+    rowLabel(rows[2], "MINIMUMS", H.money(mins) + "/mo",
+      mins > 0 ? intShare + "\u00a2 of every minimum dollar is pure interest" : null);
+    x = barX;
+    if (mins > 0) {
+      x = seg(x, rows[2], interest / mins * barW, "b-seg-int",
+        "Interest " + H.money(interest) + "/mo", true);
+      x = seg(x, rows[2], (mins - interest) / mins * barW, "b-seg-prin",
+        "Principal " + H.money(mins - interest) + "/mo", false);
+    }
+    rule(rows[2]);
+
+    /* Row 4: the debt itself */
+    rowLabel(rows[3], "DEBT OWED", H.money(debt),
+      (s.debtCount || 0) + ((s.debtCount || 0) === 1 ? " debt" : " debts") + " on the books");
+    svg.appendChild(svgEl("rect", { x: barX, y: rows[3], width: barW, height: barH, "class": "b-debtbar" }));
+    var dl = flowText(barX + barW - 12, rows[3] + barH / 2 + 5, H.money(debt), "b-seglabel-l");
+    dl.setAttribute("text-anchor", "end");
+    svg.appendChild(dl);
+
+    var bits = [];
+    if (attack > 0) bits.push(H.money(attack) + "/mo of attack is the first to strike the debt");
+    if (interest > 0) bits.push("interest alone costs " + H.money(interest) + " every month");
+    $("flow-caption").textContent = bits.length
+      ? bits.join(" \u2014 ") + "."
+      : "Your income splits into spent and kept; every kept dollar is a dollar the debt doesn't own.";
+  }
+
+  /* ---------- ledger history ---------- */
+  function renderHistory(s, hasAny) {
+    var host = $("hist-svg");
+    host.innerHTML = "";
+    var history = readKey(H.LS_HISTORY) || [];
+    if (hasAny) {
+      history = H.appendSnapshot(history, s, todayKey());
+      writeKey(H.LS_HISTORY, history);
+    }
+    var W = 960, Hh = 220;
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + Hh, "class": "hist-art" });
+    host.appendChild(svg);
+
+    if (history.length < 1) {
+      var t = flowText(480, 110, "No recorded days yet — visit once your data is connected.", "f-empty-t");
+      t.setAttribute("text-anchor", "middle");
+      svg.appendChild(t);
+      $("hist-verdict").textContent = "";
+      return;
+    }
+
+    var padL = 70, padR = 70, padT = 30, padB = 40;
+    var iw = W - padL - padR, ih = Hh - padT - padB;
+    var maxV = 1;
+    history.forEach(function (p) {
+      maxV = Math.max(maxV, Number(p.debt) || 0, Number(p.kept) || 0);
+    });
+    function X(i) { return padL + (history.length === 1 ? iw / 2 : i / (history.length - 1) * iw); }
+    function Y(v) { return padT + ih - (Number(v) || 0) / maxV * ih; }
+
+    // hairline grid
+    [0, 0.5, 1].forEach(function (f) {
+      var y = padT + ih * (1 - f);
+      svg.appendChild(svgEl("line", { x1: padL, y1: y, x2: W - padR, y2: y, "class": "g-line" }));
+      var gl = flowText(padL - 10, y + 4, H.money(maxV * f), "g-label");
+      gl.setAttribute("text-anchor", "end");
+      svg.appendChild(gl);
+    });
+
+    function series(key, cls) {
+      var d = history.map(function (p, i) {
+        return (i === 0 ? "M " : "L ") + X(i).toFixed(1) + " " + Y(p[key]).toFixed(1);
+      }).join(" ");
+      svg.appendChild(svgEl("path", { d: d, "class": cls, fill: "none" }));
+      history.forEach(function (p, i) {
+        svg.appendChild(svgEl("circle", { cx: X(i), cy: Y(p[key]), r: 4, "class": cls + "-dot" }));
+      });
+      var last = history[history.length - 1];
+      var lab = flowText(W - padR + 8, Y(last[key]) + 4, H.money(last[key]), "g-series");
+      svg.appendChild(lab);
+    }
+    series("debt", "s-debt");
+    series("kept", "s-kept");
+
+    var lg1 = flowText(padL, Hh - 12, "Debt owed", "g-legend g-legend-debt");
+    svg.appendChild(lg1);
+    var lg2 = flowText(padL + 110, Hh - 12, "Kept / month", "g-legend g-legend-kept");
+    svg.appendChild(lg2);
+
+    var tr = H.trend(history);
+    var v = $("hist-verdict");
+    if (tr.count < 2) {
+      v.textContent = "First entry recorded. Come back tomorrow and the line starts telling a story.";
+    } else if (tr.debtDown) {
+      v.textContent = "Debt is down " + H.money(tr.debtDelta) + " across " + tr.count +
+        " recorded days — the trajectory is bending the right way.";
+    } else if (tr.debtDelta < 0) {
+      v.textContent = "Debt is up " + H.money(-tr.debtDelta) + " across " + tr.count +
+        " recorded days — worth a look before it compounds.";
+    } else {
+      v.textContent = tr.count + " recorded days, debt holding steady. The attack is how it starts moving.";
+    }
+  }
+
+  /* ---------- household roadmap ---------- */
+  function renderRoadmap(s) {
+    var history = readKey(H.LS_HISTORY) || [];
+    var list = $("roadmap-list");
+    list.innerHTML = "";
+    H.roadmap(s, history).forEach(function (step, i) {
+      var li = el("li", "roadmap-step state-" + step.state);
+      li.appendChild(el("span", "roadmap-no", String(i + 1).padStart(2, "0")));
+      var body = el("div", "roadmap-body");
+      body.appendChild(el("h3", null, step.title));
+      body.appendChild(el("p", null, step.desc));
+      li.appendChild(body);
+      li.appendChild(el("span", "roadmap-mark",
+        step.state === "done" ? "Done" : (step.state === "active" ? "Now" : "Later")));
+      list.appendChild(li);
+    });
   }
 
   /* ---------- family pack ---------- */
@@ -144,6 +397,7 @@
     renderLedger();
     renderPack();
     $("search").addEventListener("input", renderCards);
+    $("print-btn").addEventListener("click", function () { window.print(); });
     /* Re-read the ledger if sibling apps wrote while this tab was open. */
     window.addEventListener("storage", renderLedger);
     window.addEventListener("focus", renderLedger);

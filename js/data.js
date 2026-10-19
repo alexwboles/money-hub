@@ -88,6 +88,10 @@
 
   var BUNDLE = { name: "Family Pack", price: 14, period: "/mo" };
 
+  /* Hub-owned ledger history (NOT part of the bridge contract — the hub
+     writes and reads this key itself). One snapshot per day, 24 kept. */
+  var LS_HISTORY = "moneyhub.ledger_history.v1";
+
   function getProduct(slug) {
     for (var i = 0; i < PRODUCTS.length; i++) if (PRODUCTS[i].slug === slug) return PRODUCTS[i];
     return null;
@@ -157,11 +161,84 @@
     });
   }
 
+  /* ---------- ledger history, vitals, roadmap (pure, node-testable) ---------- */
+
+  /* A snapshot records what the ledger showed on one calendar day. */
+  function snapshotFor(summary, dateKey) {
+    return {
+      d: dateKey,
+      kept: Math.round(summary.monthlyKept || 0),
+      debt: Math.round(summary.totalDebt || 0),
+      attack: Math.round(summary.suggestedAttack || 0)
+    };
+  }
+
+  /* Append one snapshot per day; cap at 24, oldest first. Never touches
+     localStorage — the caller loads/saves, so this stays testable. */
+  function appendSnapshot(history, summary, dateKey) {
+    history = Array.isArray(history) ? history.slice() : [];
+    history = history.filter(function (s) { return s && typeof s.d === "string"; });
+    if (history.length && history[history.length - 1].d === dateKey) return history;
+    history.push(snapshotFor(summary, dateKey));
+    if (history.length > 24) history = history.slice(history.length - 24);
+    return history;
+  }
+
+  /* Trajectory verdicts across the recorded snapshots. */
+  function trend(history) {
+    history = Array.isArray(history) ? history : [];
+    var t = { count: history.length, debtDown: false, keptPositive: false,
+              debtDelta: 0, keptAvg: 0, daysTracked: history.length };
+    if (!history.length) return t;
+    var keptSum = 0;
+    history.forEach(function (s) { keptSum += (Number(s.kept) || 0); });
+    t.keptAvg = Math.round(keptSum / history.length);
+    t.keptPositive = t.keptAvg > 0;
+    if (history.length >= 2) {
+      var first = history[0], last = history[history.length - 1];
+      t.debtDelta = Math.round((Number(first.debt) || 0) - (Number(last.debt) || 0));
+      t.debtDown = t.debtDelta > 0;
+    }
+    return t;
+  }
+
+  /* Plain-language savings-rate benchmark. */
+  function savingsBand(rate) {
+    var r = Number(rate) || 0;
+    if (r >= 0.20) return { label: "Excellent pace", tone: "good" };
+    if (r >= 0.10) return { label: "Healthy pace", tone: "good" };
+    if (r > 0) return { label: "Building", tone: "ok" };
+    if (r === 0) return { label: "Breaking even", tone: "warn" };
+    return { label: "Spending above income", tone: "bad" };
+  }
+
+  /* The household roadmap: where the family stands, from real data. */
+  function roadmap(summary, history) {
+    var t = trend(history);
+    var steps = [
+      { id: "flow", title: "Connect your cash flow",
+        desc: "Run BudgetLens on your transactions so the ledger can read them.",
+        state: summary.hasCashflow ? "done" : "active" },
+      { id: "debts", title: "Inventory your debts",
+        desc: "Add every balance, APR and minimum in DebtPayoff.",
+        state: summary.debtCount > 0 ? "done" : (summary.hasCashflow ? "active" : "todo") },
+      { id: "attack", title: "Fund the attack",
+        desc: "Turn quantified savings into a monthly attack payment.",
+        state: (summary.suggestedAttack || 0) > 0 ? "done"
+          : (summary.debtCount > 0 ? "active" : "todo") },
+      { id: "bend", title: "Bend the trajectory",
+        desc: "Recorded ledger visits showing debt shrinking over time.",
+        state: t.debtDown ? "done" : (t.count >= 2 ? "active" : "todo") }
+    ];
+    return steps;
+  }
+
   return {
     PRODUCTS: PRODUCTS,
     BRIDGES: BRIDGES,
     CONTRACT: CONTRACT,
     BUNDLE: BUNDLE,
+    LS_HISTORY: LS_HISTORY,
     getProduct: getProduct,
     totalSeparate: totalSeparate,
     bundleSavings: bundleSavings,
@@ -169,6 +246,11 @@
     moneySigned: moneySigned,
     householdSummary: householdSummary,
     attackDeepLink: attackDeepLink,
-    searchProducts: searchProducts
+    searchProducts: searchProducts,
+    snapshotFor: snapshotFor,
+    appendSnapshot: appendSnapshot,
+    trend: trend,
+    savingsBand: savingsBand,
+    roadmap: roadmap
   };
 }));

@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Money Hub — Track it. Kill it. Keep it.</title>
 <meta name="description" content="Three independent money tools for the individual — BudgetLens, DebtPayoff and TaxPrep — joined by a household ledger and working data bridges.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,750&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -12,7 +15,7 @@
 <header class="topbar">
   <div class="wrap topbar-in">
     <a class="wordmark" href="./"><span class="wordmark-ledger" aria-hidden="true"></span>Money Hub</a>
-    <p class="topbar-meta">3 tools · 1 household ledger · <strong>free to run</strong></p>
+    <p class="topbar-meta">3 tools · 1 household ledger · <strong>free to run</strong> <span class="live-dot" aria-hidden="true"></span><span class="live-label">live</span></p>
   </div>
 </header>
 
@@ -25,22 +28,38 @@
       <div class="hstat"><b>3</b><span>products</span></div>
       <div class="hstat"><b>2</b><span>working data bridges</span></div>
       <div class="hstat"><b>$14</b><span>/mo family pack</span></div>
+      <div class="hstat"><b>0</b><span>accounts or sync</span></div>
     </div>
   </div>
 </section>
 
 <main class="wrap">
 
+  <section id="flow" class="flow-sec" aria-labelledby="flow-h">
+    <div class="sec-head">
+      <p class="sec-no">No. 01</p>
+      <h2 id="flow-h">Money in motion</h2>
+      <p>One diagram of how your income moves: what gets spent, what you keep, what attacks the debt — and what interest quietly leaks out. Drawn live from your BudgetLens and DebtPayoff data.</p>
+    </div>
+    <div class="flow-sheet">
+      <div id="flow-svg" class="flow-svg" role="img" aria-label="Money flow diagram"></div>
+      <p id="flow-caption" class="flow-caption"></p>
+    </div>
+  </section>
+
   <section id="ledger" class="ledger" aria-labelledby="ledger-h">
+    <div class="sec-head">
+      <p class="sec-no">No. 02</p>
+      <h2 id="ledger-h">The household ledger</h2>
+      <p>Debt against cash flow — read live from your BudgetLens and DebtPayoff data, on this same site. No accounts, no sync, nothing leaves your browser.</p>
+    </div>
     <div class="ledger-head">
-      <div>
-        <h2 id="ledger-h">The household ledger</h2>
-        <p>Debt against cash flow — read live from your BudgetLens and DebtPayoff data, on this same site. No accounts, no sync, nothing leaves your browser.</p>
-      </div>
       <p id="ledger-source" class="ledger-source" aria-live="polite"></p>
+      <button id="print-btn" class="btn ghost print-btn" type="button">Print this ledger</button>
     </div>
     <div class="ledger-grid">
-      <div class="ledger-col">
+      <div class="ledger-col page-left">
+        <p class="page-tab">Page one — cash flow</p>
         <h3>Cash flow</h3>
         <p class="ledger-note">From BudgetLens</p>
         <dl class="ledger-lines">
@@ -54,7 +73,8 @@
         </div>
         <div id="l-topcats" class="topcats"></div>
       </div>
-      <div class="ledger-col">
+      <div class="ledger-col page-right">
+        <p class="page-tab">Page two — what you owe</p>
         <h3>Debts</h3>
         <p class="ledger-note">From DebtPayoff</p>
         <dl class="ledger-lines">
@@ -64,7 +84,9 @@
         </dl>
         <p id="l-debt-note" class="ledger-verdict"></p>
       </div>
-      <div class="ledger-col attack">
+      <div class="ledger-col memo">
+        <p class="memo-pin" aria-hidden="true"></p>
+        <p class="page-tab">Pinned memo — the attack</p>
         <h3>The attack</h3>
         <p class="ledger-note">Where the extra comes from</p>
         <p id="l-attack-amt" class="attack-amt">—</p>
@@ -73,12 +95,52 @@
         <p id="l-verdict" class="ledger-verdict"></p>
       </div>
     </div>
+    <div class="vitals">
+      <div class="vital">
+        <p class="vital-label">Savings pace</p>
+        <p class="vital-value"><span id="h-band" class="band">—</span></p>
+        <p id="h-band-label" class="vital-sub">—</p>
+      </div>
+      <div class="vital">
+        <p class="vital-label">If this pace holds</p>
+        <p class="vital-value" id="h-projected">—</p>
+        <p class="vital-sub">kept over the next 12 months</p>
+      </div>
+      <div class="vital">
+        <p class="vital-label">Debt vs. keeping</p>
+        <p class="vital-value" id="h-horizon">—</p>
+        <p class="vital-sub">months of your kept income to cover the principal, before interest. Payoff plans stay in DebtPayoff.</p>
+      </div>
+    </div>
     <p id="ledger-empty" class="ledger-empty" hidden>No local data found yet. Open <strong>BudgetLens</strong> and <strong>DebtPayoff</strong> on this same site (or serve all four folders from one local server) and the ledger fills in automatically.</p>
     <p class="ledger-fine">Honest accounting: assets aren't tracked, so this is <strong>debt vs. cash-flow</strong>, not full net worth. Payoff projections stay in DebtPayoff — the hub doesn't re-run the math.</p>
   </section>
 
+  <section id="history" class="history-sec" aria-labelledby="history-h">
+    <div class="sec-head">
+      <p class="sec-no">No. 03</p>
+      <h2 id="history-h">The trajectory</h2>
+      <p>Every visit records one line in your household's book — debt owed and money kept, one dot per day. The hub stores this on your machine only.</p>
+    </div>
+    <div class="history-sheet">
+      <div id="hist-svg" class="hist-svg" role="img" aria-label="Debt and savings trend chart"></div>
+      <p id="hist-verdict" class="hist-verdict"></p>
+      <p class="hist-note">One snapshot per day, the last 24 kept, stored in this browser under <code>moneyhub.ledger_history.v1</code>. It is the hub's own bookkeeping — not part of the bridge contract.</p>
+    </div>
+  </section>
+
+  <section id="roadmap" class="roadmap-sec" aria-labelledby="roadmap-h">
+    <div class="sec-head">
+      <p class="sec-no">No. 04</p>
+      <h2 id="roadmap-h">Your household roadmap</h2>
+      <p>Four milestones, read from your actual data — not a checklist you have to maintain.</p>
+    </div>
+    <ol id="roadmap-list" class="roadmap-list"></ol>
+  </section>
+
   <section id="bridges" aria-labelledby="bridges-h">
     <div class="sec-head">
+      <p class="sec-no">No. 05</p>
       <h2 id="bridges-h">How the data actually flows</h2>
       <p>Two small bridges, both opt-in, both honest about their limits.</p>
     </div>
@@ -104,6 +166,7 @@
 
   <section id="products" aria-labelledby="products-h">
     <div class="sec-head">
+      <p class="sec-no">No. 06</p>
       <h2 id="products-h">The three tools</h2>
       <p>Track spending, kill debt, keep it at tax time.</p>
     </div>
@@ -116,6 +179,7 @@
 
   <section id="pack" aria-labelledby="pack-h">
     <div class="sec-head">
+      <p class="sec-no">No. 07</p>
       <h2 id="pack-h">The Family Pack</h2>
     </div>
     <div class="pack-card">

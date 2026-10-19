@@ -72,6 +72,45 @@ if(h.money(5240)!=="$5,240")process.exit(1);
 if(h.moneySigned(-488)!=="−$488")process.exit(1);
 if(h.moneySigned(488)!=="$488")process.exit(1);'
 
+flow "history journey: snapshot → trend → roadmap" '
+var h=require("./js/data.js");
+var debts=[{balance:9000,apr:20,min:200}];
+var cf={months:3,monthlyIncome:3200,monthlySpending:2700,monthlyKept:500,
+  savingsRate:0.156,topCategories:[],attackSource:{monthly:150,items:[]}};
+var s=h.householdSummary(debts,cf);
+var hist=h.appendSnapshot([],s,"2026-10-18");
+var debts2=[{balance:8700,apr:20,min:200}];
+var s2=h.householdSummary(debts2,cf);
+hist=h.appendSnapshot(hist,s2,"2026-10-19");
+if(hist.length!==2)process.exit(1);
+var t=h.trend(hist);
+if(!t.debtDown||t.debtDelta!==300)process.exit(1);
+var rm=h.roadmap(s2,hist);
+if(rm.length!==4||rm[0].state!=="done"||rm[3].state!=="done")process.exit(1);'
+
+flow "history tolerates corrupt entries" '
+var h=require("./js/data.js");
+var s={monthlyKept:100,totalDebt:1000,suggestedAttack:10};
+var hist=h.appendSnapshot([null,"junk",{d:"2026-10-18",kept:1,debt:2,attack:3}],s,"2026-10-19");
+if(hist.length!==2)process.exit(1);
+if(hist[0].d!=="2026-10-18"||hist[1].d!=="2026-10-19")process.exit(1);'
+
+flow "savings band drives vitals copy" '
+var h=require("./js/data.js");
+if(h.savingsBand(0.22).label!=="Excellent pace")process.exit(1);
+if(h.savingsBand(0.15).label!=="Healthy pace")process.exit(1);
+if(h.savingsBand(0.03).tone!=="ok")process.exit(1);
+if(h.savingsBand(-0.01).tone!=="bad")process.exit(1);'
+
+flow "roadmap bend step reacts to rising debt" '
+var h=require("./js/data.js");
+var s={hasCashflow:true,debtCount:1,suggestedAttack:50};
+var hist=[{d:"a",kept:400,debt:8000,attack:50},{d:"b",kept:400,debt:8300,attack:50}];
+var rm=h.roadmap(s,hist);
+if(rm[3].state!=="active")process.exit(1);
+var t=h.trend(hist);
+if(t.debtDown||t.debtDelta!==300*-1)process.exit(1);'
+
 echo "---"
 echo "e2e: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
