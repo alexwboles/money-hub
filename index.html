@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Hub — Track it. Kill it. Keep it.</title>
+<meta name="description" content="Three independent money tools for the individual — BudgetLens, DebtPayoff and TaxPrep — joined by a household ledger and working data bridges.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="wordmark" href="./"><span class="wordmark-ledger" aria-hidden="true"></span>Money Hub</a>
+    <p class="topbar-meta">3 tools · 1 household ledger · <strong>free to run</strong></p>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="kicker">Personal-money family</p>
+    <h1>Know what you spend.<br>Kill what you owe.<br><span class="accent-line">Keep what you earn.</span></h1>
+    <p class="sub">Three independent tools for <em>your</em> money — not your business's. They share a household ledger and real data bridges, and each still stands on its own.</p>
+    <div class="hero-stats">
+      <div class="hstat"><b>3</b><span>products</span></div>
+      <div class="hstat"><b>2</b><span>working data bridges</span></div>
+      <div class="hstat"><b>$14</b><span>/mo family pack</span></div>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+
+  <section id="ledger" class="ledger" aria-labelledby="ledger-h">
+    <div class="ledger-head">
+      <div>
+        <h2 id="ledger-h">The household ledger</h2>
+        <p>Debt against cash flow — read live from your BudgetLens and DebtPayoff data, on this same site. No accounts, no sync, nothing leaves your browser.</p>
+      </div>
+      <p id="ledger-source" class="ledger-source" aria-live="polite"></p>
+    </div>
+    <div class="ledger-grid">
+      <div class="ledger-col">
+        <h3>Cash flow</h3>
+        <p class="ledger-note">From BudgetLens</p>
+        <dl class="ledger-lines">
+          <div><dt>Money in</dt><dd id="l-income">—</dd></div>
+          <div><dt>Money out</dt><dd id="l-spend">—</dd></div>
+          <div class="kept"><dt>Kept</dt><dd id="l-kept">—</dd></div>
+        </dl>
+        <div class="rate-wrap">
+          <div class="rate-label"><span>Savings rate</span><span id="l-rate-val">—</span></div>
+          <div class="rate-bar"><div id="l-rate-bar"></div></div>
+        </div>
+        <div id="l-topcats" class="topcats"></div>
+      </div>
+      <div class="ledger-col">
+        <h3>Debts</h3>
+        <p class="ledger-note">From DebtPayoff</p>
+        <dl class="ledger-lines">
+          <div><dt>Total owed</dt><dd id="l-debt">—</dd></div>
+          <div><dt>Minimums / mo</dt><dd id="l-mins">—</dd></div>
+          <div class="warn"><dt>Interest / mo</dt><dd id="l-interest">—</dd></div>
+        </dl>
+        <p id="l-debt-note" class="ledger-verdict"></p>
+      </div>
+      <div class="ledger-col attack">
+        <h3>The attack</h3>
+        <p class="ledger-note">Where the extra comes from</p>
+        <p id="l-attack-amt" class="attack-amt">—</p>
+        <ul id="l-attack-items" class="attack-items"></ul>
+        <a id="l-apply" class="btn" href="#">Apply in DebtPayoff →</a>
+        <p id="l-verdict" class="ledger-verdict"></p>
+      </div>
+    </div>
+    <p id="ledger-empty" class="ledger-empty" hidden>No local data found yet. Open <strong>BudgetLens</strong> and <strong>DebtPayoff</strong> on this same site (or serve all four folders from one local server) and the ledger fills in automatically.</p>
+    <p class="ledger-fine">Honest accounting: assets aren't tracked, so this is <strong>debt vs. cash-flow</strong>, not full net worth. Payoff projections stay in DebtPayoff — the hub doesn't re-run the math.</p>
+  </section>
+
+  <section id="bridges" aria-labelledby="bridges-h">
+    <div class="sec-head">
+      <h2 id="bridges-h">How the data actually flows</h2>
+      <p>Two small bridges, both opt-in, both honest about their limits.</p>
+    </div>
+    <div class="bridge-grid">
+      <article class="bridge">
+        <p class="bridge-id">Bridge A</p>
+        <h3>Spending → attack payment</h3>
+        <p>BudgetLens quantifies the savings its own nudges already name — subscriptions, dining, fees — and writes the monthly total to <code>budgetlens.cashflow.v1</code>. DebtPayoff reads it and offers it as your attack payment — <em>"here's where your $150/mo could come from"</em> — unless you've already set the slider yourself. Nothing is copied until you click.</p>
+        <p class="bridge-keys"><code>budgetlens.cashflow.v1</code> → <code>debtpayoff.extra.v1</code></p>
+      </article>
+      <article class="bridge">
+        <p class="bridge-id">Bridge B</p>
+        <h3>The household ledger</h3>
+        <p>This hub reads BudgetLens's monthly cash-flow and DebtPayoff's debt list — <code>budgetlens.cashflow.v1</code> and <code>debtpayoff.debts.v1</code> — and renders one ledger above. Same-origin localStorage only; host all four on one site (GitHub Pages project pages share an origin) or serve them from one local server.</p>
+        <p class="bridge-keys"><code>budgetlens.cashflow.v1</code> + <code>debtpayoff.debts.v1</code> → this page</p>
+      </article>
+    </div>
+    <aside class="fine-print">
+      <h3>The fine print</h3>
+      <p>These are independent products, not one platform. The bridges are a same-origin localStorage convention — if you run BudgetLens on a different domain than the hub, they can't see each other, and everything still works standalone. No forced connections, no cloud sync, no analytics. Full contract in the <a href="https://github.com/alexwboles/money-hub#money-bridge-contract-v1">repo README</a>.</p>
+    </aside>
+  </section>
+
+  <section id="products" aria-labelledby="products-h">
+    <div class="sec-head">
+      <h2 id="products-h">The three tools</h2>
+      <p>Track spending, kill debt, keep it at tax time.</p>
+    </div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search tools…" aria-label="Search products">
+    </div>
+    <p id="result-count" class="result-count" aria-live="polite"></p>
+    <div id="cards" class="grid"></div>
+  </section>
+
+  <section id="pack" aria-labelledby="pack-h">
+    <div class="sec-head">
+      <h2 id="pack-h">The Family Pack</h2>
+    </div>
+    <div class="pack-card">
+      <div>
+        <h3 id="pack-name">Family Pack</h3>
+        <p>All three tools' Plus plans, one price. Vision pricing — the core products are free forever.</p>
+        <p class="save" id="pack-save"></p>
+      </div>
+      <div class="pack-prices">
+        <div class="was"><span>Separately</span><strong id="separate-price"></strong></div>
+        <div class="now"><span>Family Pack</span><strong id="pack-price"></strong></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Money Hub — three independent money tools for the individual. Free to run, local-first, open source. Educational math, not financial or tax advice.</p>
+  </div>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
