@@ -83,3 +83,29 @@ Payoff projections stay in DebtPayoff — the hub never re-runs the math.
 - `REDESIGN-AUDIT.md` — competitor research (YNAB, Monarch Money, EveryDollar),
   gaps closed, identity rationale.
 - `test/smoke.sh`, `test/e2e.sh` — suites; green before every push.
+
+## Storage-safety review branch
+
+The browser validates connected-data shapes and finite numeric fields before
+rendering them. Unreadable, malformed or unsupported stored values are reported
+in the ledger status, not overwritten. History recording pauses until both
+cash-flow and debt sources are available (an explicit empty debt list is valid),
+and never replaces an unreadable history record. A failed history write reports
+that today's entry was not recorded and shows only previously stored history.
+Removing connected data clears old figures and the now-unavailable attack link.
+Numeric values outside the safe cents arithmetic range are rejected by this UI.
+This is storage validation, not verification of imported financial records.
+
+Developer QA: `bash test/smoke.sh` includes 27 checks and exits nonzero if its
+ledger assertions fail; `bash test/e2e.sh` checks 14 core logic flows (not browser
+journeys). With an existing Playwright installation, set `PLAYWRIGHT_MODULE` to
+its module path if needed and run `node test/qa-storage.cjs`. That test uses fresh
+headless Edge profiles, synthetic values, desktop/390px widths, and blocked
+HTTP(S) requests, including fonts. It covers valid/empty data, corrupt history,
+invalid bridges, missing sources, blocked reads/writes, live source removal and
+search availability. No existing browser data is used or changed.
+
+These checks do not establish customer installation, full cross-app bridge
+acceptance, backup/restore, payment/checkout, onboarding or sale readiness. The
+displayed Plus/Family Pack pricing is not proof of an implemented subscription.
+No product advertising or customer delivery was performed by this review.

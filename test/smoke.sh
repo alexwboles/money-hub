@@ -35,7 +35,7 @@ check "README documents hub-owned history key" "grep -q 'moneyhub.ledger_history
 check "README documents bridge keys" "grep -q 'budgetlens.cashflow.v1' README.md && grep -q 'debtpayoff.debts.v1' README.md"
 check "README documents deep link"   "grep -q '?attack=' README.md"
 
-node -e '
+if node -e '
 var h = require("./js/data.js");
 var assert = require("assert");
 assert.strictEqual(h.PRODUCTS.length, 3, "3 products");
@@ -101,7 +101,11 @@ assert.strictEqual(rm0[0].state, "active", "first step active with no data");
 assert.strictEqual(rm0[3].state, "todo", "bend-the-trajectory later with no history");
 var rm1 = h.roadmap({ hasCashflow: true, debtCount: 0, suggestedAttack: 0 }, []);
 assert.strictEqual(rm1[1].state, "active", "debts step active after flow");
-'
+'; then
+  PASS=$((PASS+1)); echo "PASS: catalogue and ledger assertions"
+else
+  FAIL=$((FAIL+1)); echo "FAIL: catalogue and ledger assertions"
+fi
 
 echo "---"
 echo "smoke: $PASS passed, $FAIL failed"

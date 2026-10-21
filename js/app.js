@@ -55,14 +55,51 @@
   }
 
   /* ---------- household ledger ---------- */
+  var readProblems = Object.create(null), writeProblems = Object.create(null);
+  function object(value) { return value && typeof value === "object" && !Array.isArray(value); }
+  function numeric(value) {
+    return (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) &&
+      Number.isFinite(Number(value)) && Math.abs(Number(value)) <= Number.MAX_SAFE_INTEGER / 100;
+  }
+  function validStoredValue(key, value) {
+    if (key === H.LS_HISTORY) return Array.isArray(value) && value.every(function (p) {
+      return object(p) && typeof p.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.d) &&
+        numeric(p.kept) && numeric(p.debt) && numeric(p.attack);
+    });
+    if (value === null) return true;
+    if (key === "debtpayoff.debts.v1") return Array.isArray(value) && value.every(function (d) {
+      return object(d) && ["balance", "apr", "min"].every(function (field) {
+        return numeric(d[field]) && Number(d[field]) >= 0;
+      });
+    });
+    if (key === "budgetlens.cashflow.v1") return object(value) &&
+      ["monthlyIncome", "monthlySpending", "monthlyKept", "savingsRate"].every(function (k) { return numeric(value[k]); }) &&
+      (!value.topCategories || (Array.isArray(value.topCategories) && value.topCategories.every(function (c) { return object(c) && numeric(c.monthly); }))) &&
+      (!value.attackSource || (object(value.attackSource) && numeric(value.attackSource.monthly) &&
+        (!value.attackSource.items || (Array.isArray(value.attackSource.items) && value.attackSource.items.every(function (i) { return object(i) && numeric(i.monthly); })))));
+    return true;
+  }
   function readKey(key) {
     try {
       var raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
+      var value = raw === null ? null : JSON.parse(raw);
+      if (raw !== null && !validStoredValue(key, value)) throw new Error("Unsupported saved-data shape");
+      delete readProblems[key];
+      return value;
+    } catch (e) { readProblems[key] = true; return null; }
   }
   function writeKey(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    try { localStorage.setItem(key, JSON.stringify(val)); delete writeProblems[key]; return true; }
+    catch (e) { writeProblems[key] = true; return false; }
+  }
+  function renderDataStatus() {
+    var status = $("data-status"), unreadable = Object.keys(readProblems), unsaved = Object.keys(writeProblems);
+    var incomplete = state.hasData && !state.hasCompleteData;
+    status.hidden = !unreadable.length && !unsaved.length && !incomplete;
+    status.textContent = (unreadable.length ? "Saved data is unavailable or invalid: " + unreadable.join(", ") +
+      ". Original stored values have not been replaced. History is paused while connected inputs are unreadable. " : "") +
+      (unsaved.length ? "History could not be saved. Today's snapshot is not recorded; earlier stored data is unchanged. " : "") +
+      (incomplete ? "History is paused until both cash-flow and debt sources are available; missing data is not recorded as zero." : "");
   }
   function todayKey() {
     var d = new Date();
@@ -78,6 +115,7 @@
     var hasAny = !!cashflow || (debts && debts.length);
     state.summary = s;
     state.hasData = hasAny;
+    state.hasCompleteData = !!cashflow && Array.isArray(debts);
 
     $("ledger-empty").hidden = !!hasAny;
     $("ledger-source").innerHTML = hasAny
@@ -103,6 +141,10 @@
         chip.appendChild(document.createTextNode(c.icon + " " + c.name + " " + H.money(c.monthly) + "/mo · " + share + "%"));
         tc.appendChild(chip);
       });
+    } else {
+      ["l-income", "l-spend", "l-kept", "l-rate-val"].forEach(function (id) { $(id).textContent = "—"; });
+      $("l-rate-bar").style.width = "0%";
+      $("l-topcats").textContent = "";
     }
 
     if (debts && debts.length) {
@@ -111,6 +153,9 @@
       $("l-interest").textContent = H.money(s.monthlyInterest) + "/mo";
       $("l-debt-note").textContent = s.debtCount + (s.debtCount === 1 ? " debt" : " debts") +
         " on the books — interest alone costs " + H.money(s.monthlyInterest) + " every month.";
+    } else {
+      ["l-debt", "l-mins", "l-interest"].forEach(function (id) { $(id).textContent = "—"; });
+      $("l-debt-note").textContent = "";
     }
 
     if (s.suggestedAttack > 0) {
@@ -126,12 +171,17 @@
       var apply = $("l-apply");
       apply.href = H.attackDeepLink(s.suggestedAttack);
       apply.classList.remove("disabled");
+      apply.removeAttribute("aria-disabled");
+      apply.removeAttribute("tabindex");
       apply.textContent = "Apply " + H.money(s.suggestedAttack) + "/mo in DebtPayoff →";
     } else {
       $("l-attack-amt").textContent = "—";
       $("l-attack-items").innerHTML = "<li>No quantified savings found yet — run BudgetLens on your transactions.</li>";
       var applyBtn = $("l-apply");
       applyBtn.classList.add("disabled");
+      applyBtn.removeAttribute("href");
+      applyBtn.setAttribute("aria-disabled", "true");
+      applyBtn.setAttribute("tabindex", "-1");
       applyBtn.textContent = "Apply in DebtPayoff →";
     }
 
@@ -140,6 +190,8 @@
       verdict.textContent = "You're keeping " + H.money(s.monthlyKept) + "/mo against " +
         H.money(s.totalDebt) + " of debt. At that pace the principal alone is ~" +
         s.monthsOfKeeping + " months of keeping — before interest. That's what the attack is for.";
+    } else if (cashflow && debts && debts.length) {
+      verdict.textContent = "Cash flow and debts are loaded. No positive kept-income horizon is available; this is not a payoff forecast.";
     } else if (cashflow) {
       verdict.textContent = "You're keeping " + H.moneySigned(s.monthlyKept) + "/mo. No debts on the books — the ledger balances.";
     } else if (debts && debts.length) {
@@ -152,12 +204,13 @@
     renderFlow(s, hasAny);
     renderHistory(s, hasAny);
     renderRoadmap(s);
+    renderDataStatus();
   }
 
   /* ---------- health vitals ---------- */
   function renderVitals(s, hasAny) {
     var band = $("h-band");
-    if (!hasAny) {
+    if (!hasAny || !s.hasCashflow) {
       band.textContent = "—"; band.className = "band";
       $("h-band-label").textContent = "—";
       $("h-projected").textContent = "—";
@@ -193,7 +246,7 @@
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + Hh, "class": "flow-art" });
     host.appendChild(svg);
 
-    if (!hasAny) {
+    if (!hasAny || !s.hasCashflow) {
       var emptySvg = svgEl("svg", { viewBox: "0 0 960 330", "class": "flow-art" });
       host.replaceChild(emptySvg, svg);
       svg = emptySvg;
@@ -297,9 +350,15 @@
     var host = $("hist-svg");
     host.innerHTML = "";
     var history = readKey(H.LS_HISTORY) || [];
-    if (hasAny) {
-      history = H.appendSnapshot(history, s, todayKey());
-      writeKey(H.LS_HISTORY, history);
+    if (readProblems[H.LS_HISTORY]) {
+      $("hist-verdict").textContent = "History is unavailable. Original stored data has not been replaced.";
+      return;
+    }
+    var saved = true;
+    if (state.hasCompleteData && !readProblems["budgetlens.cashflow.v1"] && !readProblems["debtpayoff.debts.v1"]) {
+      var next = H.appendSnapshot(history, s, todayKey());
+      saved = writeKey(H.LS_HISTORY, next);
+      if (saved) history = next;
     }
     var W = 960, Hh = 220;
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + Hh, "class": "hist-art" });
@@ -309,7 +368,7 @@
       var t = flowText(480, 110, "No recorded days yet — visit once your data is connected.", "f-empty-t");
       t.setAttribute("text-anchor", "middle");
       svg.appendChild(t);
-      $("hist-verdict").textContent = "";
+      $("hist-verdict").textContent = saved ? "" : "Today's snapshot could not be saved. No new history entry was recorded.";
       return;
     }
 
@@ -364,6 +423,7 @@
     } else {
       v.textContent = tr.count + " recorded days, debt holding steady. The attack is how it starts moving.";
     }
+    if (!saved) v.textContent = "Today's snapshot could not be saved. Showing previously stored history only.";
   }
 
   /* ---------- household roadmap ---------- */
