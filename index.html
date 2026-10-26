@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Money Hub — Track it. Kill it. Keep it.</title>
 <meta name="description" content="Three independent money tools for the individual — BudgetLens, DebtPayoff and TaxPrep — joined by a household ledger and working data bridges.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,750&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -42,7 +39,7 @@
       <p>One diagram of how your income moves: what gets spent, what you keep, what attacks the debt — and what interest quietly leaks out. Drawn live from your BudgetLens and DebtPayoff data.</p>
     </div>
     <div class="flow-sheet">
-      <div id="flow-svg" class="flow-svg" role="img" aria-label="Money flow diagram"></div>
+      <div id="flow-svg" class="flow-svg" role="img" tabindex="0" aria-label="Money flow diagram; scroll horizontally on narrow screens"></div>
       <p id="flow-caption" class="flow-caption"></p>
     </div>
   </section>
@@ -124,7 +121,7 @@
       <p>Every visit records one line in your household's book — debt owed and money kept, one dot per day. The hub stores this on your machine only.</p>
     </div>
     <div class="history-sheet">
-      <div id="hist-svg" class="hist-svg" role="img" aria-label="Debt and savings trend chart"></div>
+      <div id="hist-svg" class="hist-svg" role="img" tabindex="0" aria-label="Debt and savings trend chart; scroll horizontally on narrow screens"></div>
       <p id="hist-verdict" class="hist-verdict"></p>
       <p class="hist-note">One snapshot per day, the last 24 kept, stored in this browser under <code>moneyhub.ledger_history.v1</code>. It is the hub's own bookkeeping — not part of the bridge contract.</p>
     </div>

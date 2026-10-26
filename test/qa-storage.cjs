@@ -23,9 +23,9 @@ const cases = [
   try {
     for(const width of [1440,390]) for(const fixture of cases) {
       const context=await browser.newContext({viewport:{width,height:900}});
-      const page=await context.newPage(), errors=[];
+      const page=await context.newPage(), errors=[], requests=[];
       page.on('pageerror',e=>errors.push(e.message));
-      await page.route(/^https?:/,r=>r.abort()); // includes externally hosted fonts
+      await page.route(/^https?:/,r=>{requests.push(r.request().url());return r.abort();});
       await page.addInitScript(({fixture,keys})=>{
         const read=Storage.prototype.getItem,write=Storage.prototype.setItem;
         for(const [key,value] of Object.entries(fixture.values)) write.call(localStorage,key,value);
@@ -50,6 +50,18 @@ const cases = [
         for(const id of ['l-income','l-spend','l-kept','l-rate-val','l-debt','l-mins','l-interest','h-projected']) assert.equal(await page.locator('#'+id).innerText(),'—');
         assert.equal(await page.locator('#l-apply').getAttribute('href'),null);
         assert.equal(await page.locator('#l-apply').getAttribute('aria-disabled'),'true');
+      }
+      assert.equal(await page.locator('#cards .card').count(),3,'Full catalogue renders');
+      await page.evaluate(()=>document.fonts.ready);
+      assert.deepEqual(requests,[],'Local page must not attempt external HTTP(S) requests');
+      const overflow=await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).map(el=>({tag:el.tagName,id:el.id,cls:typeof el.className==='string'?el.className:'svg',right:Math.round(el.getBoundingClientRect().right),text:(el.textContent||'').trim().slice(0,90)})).filter(el=>el.right>innerWidth+1).slice(0,15));
+      assert(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth + 1),'Page fits viewport '+width+' '+fixture.name+': '+JSON.stringify(overflow));
+      if(width===390) for(const id of ['flow-svg','hist-svg']) {
+        const chart=page.locator('#'+id);
+        assert.equal(await chart.getAttribute('tabindex'),'0');
+        if(await chart.locator('svg').count()) {
+          assert(await chart.evaluate(el=>el.scrollWidth>el.clientWidth && getComputedStyle(el).overflowX==='auto'),'Chart scroll stays inside its panel');
+        }
       }
       await page.locator('#search').fill('debt');
       assert.equal(await page.locator('#cards .card').count(),1,'Search stays usable');

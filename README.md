@@ -109,3 +109,18 @@ These checks do not establish customer installation, full cross-app bridge
 acceptance, backup/restore, payment/checkout, onboarding or sale readiness. The
 displayed Plus/Family Pack pricing is not proof of an implemented subscription.
 No product advertising or customer delivery was performed by this review.
+
+## Local-page privacy check
+
+The review branch removes hosted Google font stylesheets and preconnections,
+using the existing Georgia/system monospace fallbacks instead. Opening the
+local hub no longer needs a font-provider request. The browser regression suite
+records and rejects attempted external HTTP(S) page requests, checks fonts have
+settled, and verifies desktop/390px viewport fit across its synthetic scenarios.
+The mobile history chart now scrolls inside its panel rather than widening the
+whole page. Both chart panels are keyboard-focusable and retain a legible
+minimum chart width on narrow screens.
+These checks apply to the local page, not browser background traffic, hosting
+server logs or the privacy behavior of other apps. External repository links
+still navigate to GitHub if the user chooses to follow them. Full sibling-app
+integration, customer delivery/onboarding and commercial acceptance remain open.
